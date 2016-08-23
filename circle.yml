@@ -35,5 +35,8 @@ dependencies:
     - ~/.atom/compile-cache
 
 test:
+  pre:
+    - echo $PARALLELISM
+
   override:
     - caffeinate -s script/test # Run with caffeinate to prevent screen saver

@@ -6,5 +6,5 @@ Test 5 - Set PARALLELISM envar to 4
 Test 6 - Set PARALLELISM envar to 2 (19:00)
 Test 7 - Set PARALLELISM envar to 2
 Test 8 - 6v4G - Par 4
-Test 9 - 8v4G - Par 4
+Test 9 - 8v4G - Par 04
 

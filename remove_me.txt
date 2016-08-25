@@ -8,3 +8,4 @@ Test 7 - Set PARALLELISM envar to 2
 Test 8 - 6v4G - Par 4
 Test 9 - 8v4G - Par 4
 Test 10 - 8v4g - Par 6
+Test 11 - 8v4g - Par 8

@@ -6,6 +6,7 @@ require('colors')
 const async = require('async')
 const childProcess = require('child_process')
 const fs = require('fs')
+const glob = require('glob')
 const path = require('path')
 
 const CONFIG = require('./config')
@@ -14,6 +15,7 @@ const appName = CONFIG.channel === 'beta' ? 'Atom Beta' : 'Atom'
 const packagedAppPath = path.resolve(__dirname, '..', 'out', `${appName}.app`)
 const executablePath = path.join(packagedAppPath, 'Contents', 'MacOS', appName)
 const resourcePath = CONFIG.repositoryRootPath
+const degreeOfParallelism = process.env.PARALLELISM || 1
 
 function runCoreMainProcessTests (callback) {
   const testPath = path.join(CONFIG.repositoryRootPath, 'spec', 'main-process')
@@ -28,17 +30,23 @@ function runCoreMainProcessTests (callback) {
   cp.on('close', exitCode => { callback(null, exitCode) })
 }
 
-function runCoreRenderProcessTests (callback) {
-  const testPath = path.join(CONFIG.repositoryRootPath, 'spec')
-  const testArguments = [
-    '--resource-path', resourcePath,
-    '--test', testPath
-  ]
+const renderProcessTestSuites = []
+const coreRendererProcessSpecPaths = glob.sync(path.join(CONFIG.repositoryRootPath, 'spec', '**', '*-spec.{coffee,js}'))
+const partitionSize = Math.ceil(coreRendererProcessSpecPaths.length / degreeOfParallelism)
+while (coreRendererProcessSpecPaths.length > 0) {
+  const specPaths = coreRendererProcessSpecPaths.splice(0, partitionSize)
+  renderProcessTestSuites.push(function (callback) {
+    const testArguments = [
+      '--resource-path', resourcePath,
+      '--test'
+    ].concat(specPaths)
 
-  console.log('Executing core render process tests'.bold.green)
-  const cp = childProcess.spawn(executablePath, testArguments, {stdio: 'inherit'})
-  cp.on('error', error => { callback(error) })
-  cp.on('close', exitCode => { callback(null, exitCode) })
+    console.log(`Executing core render process tests`.bold.green)
+    console.log(specPaths.map(p => path.basename(p)).join(',').gray);
+    const cp = childProcess.spawn(executablePath, testArguments, {stdio: 'inherit'})
+    cp.on('error', error => { callback(error) })
+    cp.on('close', exitCode => { callback(null, exitCode) })
+  })
 }
 
 // Build an array of functions, each running tests for a different bundled package
@@ -68,8 +76,7 @@ for (let packageName in CONFIG.appMetadata.packageDependencies) {
   })
 }
 
-const testSuitesToRun = [runCoreMainProcessTests, runCoreRenderProcessTests].concat(packageTestSuites)
-const degreeOfParallelism = process.env.PARALLELISM || 1
+const testSuitesToRun = [runCoreMainProcessTests].concat(renderProcessTestSuites).concat(packageTestSuites)
 
 async.parallelLimit(testSuitesToRun, degreeOfParallelism, function (err, exitCodes) {
   if (err) {

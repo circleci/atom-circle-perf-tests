@@ -21,33 +21,22 @@ const appMetadata = require(path.join(repositoryRootPath, 'package.json'))
 const apmMetadata = require(path.join(apmRootPath, 'package.json'))
 const channel = getChannel()
 
-const apmBinPath = getApmBinPath()
-const npmBinPath = getNpmBinPath()
-
 module.exports = {
   appMetadata, apmMetadata, channel,
   repositoryRootPath, apmRootPath, scriptRootPath,
   buildOutputPath, docsOutputPath, intermediateAppPath, symbolsPath,
   electronDownloadPath, atomHomeDirPath, homeDirPath,
-  apmBinPath, npmBinPath
+  getApmBinPath, getNpmBinPath
 }
 
 function getChannel () {
-  if (appMetadata.version.match(/dev/) || isBuildingPR()) {
+  if (appMetadata.version.match(/dev/)) {
     return 'dev'
   } else if (appMetadata.version.match(/beta/)) {
     return 'beta'
   } else {
     return 'stable'
   }
-}
-
-function isBuildingPR () {
-  return (
-    process.env.APPVEYOR_PULL_REQUEST_NUMBER ||
-    process.env.TRAVIS_PULL_REQUEST ||
-    process.env.CI_PULL_REQUEST
-  )
 }
 
 function getApmBinPath () {

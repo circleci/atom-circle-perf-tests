@@ -18,14 +18,6 @@ module.exports = function (packagedAppPath) {
   // RPM versions can't have dashes or tildes in them.
   // (Ref.: https://twiki.cern.ch/twiki/bin/view/Main/RPMAndDebVersioning)
   const appVersion = CONFIG.appMetadata.version.replace(/-/g, '.')
-  let arch
-  if (process.arch === 'ia32') {
-    arch = 'i386'
-  } else if (process.arch === 'x64') {
-    arch = 'amd64'
-  } else {
-    arch = process.arch
-  }
 
   const rpmPackageDirPath = path.join(CONFIG.homeDirPath, 'rpmbuild')
   const rpmPackageBuildDirPath = path.join(rpmPackageDirPath, 'BUILD')
@@ -68,7 +60,7 @@ module.exports = function (packagedAppPath) {
   const desktopEntryTemplate = fs.readFileSync(path.join(CONFIG.repositoryRootPath, 'resources', 'linux', 'atom.desktop.in'))
   const desktopEntryContents = template(desktopEntryTemplate)({
     appName: appName, appFileName: atomExecutableName, description: appDescription,
-    installDir: '/usr', iconName: atomExecutableName
+    installDir: '/usr', iconPath: atomExecutableName
   })
   fs.writeFileSync(path.join(rpmPackageBuildDirPath, `${atomExecutableName}.desktop`), desktopEntryContents)
 

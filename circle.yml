@@ -24,7 +24,6 @@ dependencies:
     - npm install -g npm
 
   override:
-    - script/bootstrap
     - script/build --code-sign --compress-artifacts
 
   cache_directories:
@@ -36,4 +35,11 @@ dependencies:
 
 test:
   override:
+    - script/lint
     - caffeinate -s script/test # Run with caffeinate to prevent screen saver
+
+experimental:
+  notify:
+    branches:
+      only:
+        - master

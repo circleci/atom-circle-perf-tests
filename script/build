@@ -2,6 +2,10 @@
 
 'use strict'
 
+// Run bootstrap first to ensure all the dependencies used later in this script
+// are installed.
+require('./bootstrap')
+
 // Needed so we can require src/module-cache.coffee during generateModuleCache
 require('coffee-script/register')
 require('colors')
@@ -38,7 +42,7 @@ const transpileCsonPaths = require('./lib/transpile-cson-paths')
 const transpilePegJsPaths = require('./lib/transpile-peg-js-paths')
 
 process.on('unhandledRejection', function (e) {
-  console.error(e)
+  console.error(e.stack || e)
   process.exit(1)
 })
 
@@ -67,7 +71,7 @@ dumpSymbols()
         return createWindowsInstaller(packagedAppPath, argv.codeSign).then(() => packagedAppPath)
       }
       else {
-        console.log('Skipping creating installer. Specify the --create-windows-installer option to create a Squirrel-based Windows installer.'.gray)
+        console.log('Skipping creating installer. Specify the --create-windows-installer option to create a Squirrel-based Windows installer. Code-signing was skipped too.'.gray)
       }
     } else if (process.platform === 'linux') {
       if (argv.createDebianPackage) {

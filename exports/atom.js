@@ -27,12 +27,17 @@ const atomExport = {
 
 // Shell integration is required by both Squirrel and Settings-View
 if (process.platform === 'win32') {
-  atomExport.WinShell = require('../src/main-process/win-shell')
+  Object.defineProperty(atomExport, 'WinShell', {
+    enumerable: true,
+    get () {
+      return require('../src/main-process/win-shell')
+    }
+  })
 }
 
 // The following classes can't be used from a Task handler and should therefore
 // only be exported when not running as a child node process
-if (!process.env.ATOM_SHELL_INTERNAL_RUN_AS_NODE) {
+if (process.type === 'renderer') {
   atomExport.Task = require('../src/task')
 
   const TextEditor = (params) => {

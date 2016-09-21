@@ -14,15 +14,20 @@ const ATOM_RESOURCE_PATH = path.resolve(__dirname, '..', '..')
 describe('AtomApplication', function () {
   this.timeout(60 * 1000)
 
-  let originalAtomHome, atomApplicationsToDestroy
+  let originalAppQuit, originalAtomHome, atomApplicationsToDestroy
 
   beforeEach(function () {
+    originalAppQuit = electron.app.quit
+    mockElectronAppQuit()
     originalAtomHome = process.env.ATOM_HOME
     process.env.ATOM_HOME = makeTempDir('atom-home')
     // Symlinking the compile cache into the temporary home dir makes the windows load much faster
     fs.symlinkSync(path.join(originalAtomHome, 'compile-cache'), path.join(process.env.ATOM_HOME, 'compile-cache'))
     season.writeFileSync(path.join(process.env.ATOM_HOME, 'config.cson'), {
-      '*': {welcome: {showOnStartup: false}}
+      '*': {
+        welcome: {showOnStartup: false},
+        core: {telemetryConsent: 'no'}
+      }
     })
     atomApplicationsToDestroy = []
   })
@@ -33,6 +38,7 @@ describe('AtomApplication', function () {
       await atomApplication.destroy()
     }
     await clearElectronSession()
+    electron.app.quit = originalAppQuit
   })
 
   describe('launch', function () {
@@ -87,22 +93,24 @@ describe('AtomApplication', function () {
       assert.equal(openedPath, filePath)
     })
 
-    it('positions new windows at an offset distance from the previous window', async function () {
-      const atomApplication = buildAtomApplication()
+    if (process.platform === 'darwin' || process.platform === 'win32') {
+      it('positions new windows at an offset distance from the previous window', async function () {
+        const atomApplication = buildAtomApplication()
 
-      const window1 = atomApplication.launch(parseCommandLine([makeTempDir()]))
-      await focusWindow(window1)
-      window1.browserWindow.setBounds({width: 400, height: 400, x: 0, y: 0})
+        const window1 = atomApplication.launch(parseCommandLine([makeTempDir()]))
+        await focusWindow(window1)
+        window1.browserWindow.setBounds({width: 400, height: 400, x: 0, y: 0})
 
-      const window2 = atomApplication.launch(parseCommandLine([makeTempDir()]))
-      await focusWindow(window2)
+        const window2 = atomApplication.launch(parseCommandLine([makeTempDir()]))
+        await focusWindow(window2)
 
-      assert.notEqual(window1, window2)
-      window1Dimensions = window1.getDimensions()
-      window2Dimensions = window2.getDimensions()
-      assert.isAbove(window2Dimensions.x, window1Dimensions.x)
-      assert.isAbove(window2Dimensions.y, window1Dimensions.y)
-    })
+        assert.notEqual(window1, window2)
+        const window1Dimensions = window1.getDimensions()
+        const window2Dimensions = window2.getDimensions()
+        assert.isAbove(window2Dimensions.x, window1Dimensions.x)
+        assert.isAbove(window2Dimensions.y, window1Dimensions.y)
+      })
+    }
 
     it('reuses existing windows when opening paths, but not directories', async function () {
       const dirAPath = makeTempDir("a")
@@ -218,9 +226,7 @@ describe('AtomApplication', function () {
       const window1 = atomApplication.launch(parseCommandLine([dirAPath, dirBPath]))
       await focusWindow(window1)
 
-      await new Promise(function (resolve) {
-        setTimeout(resolve, 1000)
-      })
+      await timeoutPromise(1000)
 
       let treeViewPaths = await evalInWebContents(window1.browserWindow.webContents, function (sendBackToMainProcess) {
         sendBackToMainProcess(
@@ -363,6 +369,44 @@ describe('AtomApplication', function () {
       await focusWindow(app2Window)
       assert.deepEqual(await getTreeViewRootDirectories(app2Window), [])
     })
+
+    describe('when closing the last window', function () {
+      if (process.platform === 'linux' || process.platform === 'win32') {
+        it('quits the application', async function () {
+          const atomApplication = buildAtomApplication()
+          const window = atomApplication.launch(parseCommandLine([path.join(makeTempDir("a"), 'file-a')]))
+          await focusWindow(window)
+          window.close()
+          await window.closedPromise
+          assert(electron.app.hasQuitted())
+        })
+      } else if (process.platform === 'darwin') {
+        it('leaves the application open', async function () {
+          const atomApplication = buildAtomApplication()
+          const window = atomApplication.launch(parseCommandLine([path.join(makeTempDir("a"), 'file-a')]))
+          await focusWindow(window)
+          window.close()
+          await window.closedPromise
+          assert(!electron.app.hasQuitted())
+        })
+      }
+    })
+  })
+
+  describe('before quitting', function () {
+    it('waits until all the windows have saved their state and then quits', async function () {
+      const dirAPath = makeTempDir("a")
+      const dirBPath = makeTempDir("b")
+      const atomApplication = buildAtomApplication()
+      const window1 = atomApplication.launch(parseCommandLine([path.join(dirAPath, 'file-a')]))
+      await focusWindow(window1)
+      const window2 = atomApplication.launch(parseCommandLine([path.join(dirBPath, 'file-b')]))
+      await focusWindow(window2)
+      electron.app.quit()
+      assert(!electron.app.hasQuitted())
+      await Promise.all([window1.lastSaveStatePromise, window2.lastSaveStatePromise])
+      assert(electron.app.hasQuitted())
+    })
   })
 
   function buildAtomApplication () {
@@ -378,6 +422,20 @@ describe('AtomApplication', function () {
     window.focus()
     await window.loadedPromise
     await conditionPromise(() => window.atomApplication.lastFocusedWindow === window)
+  }
+
+  function mockElectronAppQuit () {
+    let quitted = false
+    electron.app.quit = function () {
+      let shouldQuit = true
+      electron.app.emit('before-quit', {preventDefault: () => { shouldQuit = false }})
+      if (shouldQuit) {
+        quitted = true
+      }
+    }
+    electron.app.hasQuitted = function () {
+      return quitted
+    }
   }
 
   function makeTempDir (name) {

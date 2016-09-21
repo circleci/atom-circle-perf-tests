@@ -20,11 +20,13 @@ module.exports = function (packagedAppPath) {
     arch = 'i386'
   } else if (process.arch === 'x64') {
     arch = 'amd64'
+  } else if (process.arch === 'ppc') {
+    arch = 'powerpc'
   } else {
     arch = process.arch
   }
 
-  const outputDebianPackageFilePath = path.join(CONFIG.buildOutputPath, `atom-amd64.deb`)
+  const outputDebianPackageFilePath = path.join(CONFIG.buildOutputPath, `atom-${arch}.deb`)
   const debianPackageDirPath = path.join(os.tmpdir(), path.basename(packagedAppPath))
   const debianPackageConfigPath = path.join(debianPackageDirPath, 'DEBIAN')
   const debianPackageInstallDirPath = path.join(debianPackageDirPath, 'usr')
@@ -84,7 +86,7 @@ module.exports = function (packagedAppPath) {
   const desktopEntryTemplate = fs.readFileSync(path.join(CONFIG.repositoryRootPath, 'resources', 'linux', 'atom.desktop.in'))
   const desktopEntryContents = template(desktopEntryTemplate)({
     appName: appName, appFileName: atomExecutableName, description: appDescription,
-    installDir: '/usr', iconName: atomExecutableName
+    installDir: '/usr', iconPath: atomExecutableName
   })
   fs.writeFileSync(path.join(debianPackageApplicationsDirPath, `${atomExecutableName}.desktop`), desktopEntryContents)
 

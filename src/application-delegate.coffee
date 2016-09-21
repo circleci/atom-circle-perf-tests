@@ -57,6 +57,9 @@ class ApplicationDelegate
   reloadWindow: ->
     ipcRenderer.send("call-window-method", "reload")
 
+  restartApplication: ->
+    ipcRenderer.send("restart-application")
+
   minimizeWindow: ->
     ipcRenderer.send("call-window-method", "minimize")
 
@@ -243,6 +246,17 @@ class ApplicationDelegate
     ipcRenderer.on('context-command', outerCallback)
     new Disposable ->
       ipcRenderer.removeListener('context-command', outerCallback)
+
+  onSaveWindowStateRequest: (callback) ->
+    outerCallback = (event, message) ->
+      callback(event)
+
+    ipcRenderer.on('save-window-state', outerCallback)
+    new Disposable ->
+      ipcRenderer.removeListener('save-window-state', outerCallback)
+
+  didSaveWindowState: ->
+    ipcRenderer.send('did-save-window-state')
 
   didCancelWindowUnload: ->
     ipcRenderer.send('did-cancel-window-unload')
